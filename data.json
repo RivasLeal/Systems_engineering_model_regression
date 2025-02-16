@@ -1,0 +1,70 @@
+{
+    "Labor Hours in a Month" : 166.6,
+    "Environment Mode" : "Embedded",
+
+    "Projects":
+    {
+        "Gold Star":
+        {
+            "SLOC" : 51000,
+            "Development Time" : 1.25,
+            "Effort" : 0.9709
+        },
+
+        "UniStar":
+        {
+            "SLOC" : 403000,
+            "Development Time" : 4.25,
+            "Effort" : 8.9918
+        },
+
+        "SlipStream":
+        {
+            "SLOC" : 465000,
+            "Development Time" : 4.75,
+            "Effort" : 10.533
+        },
+
+        "Fargo":
+        {
+            "SLOC" : 235000,
+            "Development Time" : 2.50,
+            "Effort" : 5.9597
+        },
+
+        "Sky Knight":
+        {
+            "SLOC" : 120000,
+            "Development Time" : 2.25,
+            "Effort" : 2.4803
+        },
+
+        "Sky Line":
+        {
+            "SLOC" : 310000,
+            "Development Time" : 4.00,
+            "Effort" : 6.0036
+        },
+
+        "Deep Water":
+        {
+            "SLOC" : 76000,
+            "Development Time" : 1.50,
+            "Effort" : 1.5749
+        },
+
+        "Brilliant Dove":
+        {
+            "SLOC" : 64500,
+            "Development Time" : 1.50,
+            "Effort" : 1.2543
+        },
+
+        "Night Reaver":
+        {
+            "SLOC" : 198000,
+            "Development Time" : 2.00,
+            "Effort" : 5.5824
+        }
+    }
+}
