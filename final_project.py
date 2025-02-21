@@ -17,7 +17,7 @@
 
 # TODO
 # from sys import argv
-from numpy import array, var
+from numpy import array, var, log
 from Data_Creation import Curve_plot
 from json import load
 from Model_Types.COCOMO import COCOMO_ENUM, COCOMO
@@ -75,15 +75,12 @@ def main():
 
     labor_hours  = data[labor_hours_string]
     env_mode = data[env_mode_string]
-
-    data_array.sort(key=lambda x: x[1])
+    temp_SLIM = SLIM()
 
     # Create a COCOMO ENUM of UNDEFINED
     cocomo_enum = COCOMO_ENUM(0)
 
     cur_pl = Curve_plot.DataStorage(data_array)
-    # cur_pl.degree = 6
-    # cur_pl.plot_data(show=True)
 
     a, b = cur_pl.fit_exponential_equation(all_effort, all_dev_time, all_c)
 
@@ -95,37 +92,43 @@ def main():
         c.append(cal_c)
         c_avg += cal_c
 
-    c_avg /= len(data_array_temp)
+    sqrt_c_vals = []
+    for _ in c:
+        sqrt_c_vals.append(_ ** 0.5)
 
-    for c_vals in c:
-        print(51000/c_vals)
+    new_C_values = []
+    for c , a in zip(sqrt_c_vals,data_array):
+       new_C_values.append(a[0] / c)
 
-    # print(e ** c_avg)
+    newPs = []
+    newQs = []
 
-    # print(cur_pl.get_C(a, b, all_effort[0], all_dev_time[0]))
+    for newC, arTemp, daTemp in zip(new_C_values, data_array_temp, data_array):
+        ln_K = log(arTemp[0])
+        ln_td = log(arTemp[1])
+        ln_SLOC_newC = log(daTemp[0]/newC)
 
-    # # Based on our JSON, get what our environment is
-    # cocomo_enum = cocomo_enum.get_model_type_from_string(env_mode)
 
-    # cocomo_model = COCOMO(64.5, cocomo_enum)
-
-    # slim_model = SLIM()
-
-    # slim_model.S = 64500
-    # slim_model.K = 1.2543
-    # slim_model.t_d = 1.50
-    # slim_model.C = slim_model.solve_for_constant()
-
-    # print(slim_model.solve_for_constant())
-
-    # # # Dev Months -> Dev Years
-    # # dev_time_years = cocomo_model.dev_time_months / 12
+        temp11 = ln_SLOC_newC - (temp_SLIM.func.p * ln_K)
+        temp12 = ln_SLOC_newC - (temp_SLIM.func.q * ln_td)
+        
+        newPs.append(temp11 / ln_td )
+        newQs.append(temp12 / ln_K )
 
     
-    # # lb_years = dev_time_years / 1.5 # cocomo_model.effort_months
+    newAvgP = sum(newPs) / len(newPs)
+    newAvgQ = sum(newQs) / len(newQs)
 
-    # # print("Effort: {}".format(lb_years))
-    # # print("Dev Time (YRS): {}".format(dev_time_years))
+    print(newAvgP)
+    print(newAvgQ)
+
+    for proj in data[project_string]:
+        slim_proj_dict[proj].func.p = newAvgP
+        slim_proj_dict[proj].func.q = newAvgQ
+        slim_proj_dict[proj].C = 51087.4267295428
+
+        print(slim_proj_dict[proj].solve_for_K())
+
 
 if __name__ == '__main__':
 

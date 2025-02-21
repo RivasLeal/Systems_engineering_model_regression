@@ -20,6 +20,7 @@ from math import isclose
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from math import e
+import statsmodels.api as sm
 
 class DataStorage:
     def __init__(self, data):
