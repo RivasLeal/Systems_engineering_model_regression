@@ -15,6 +15,8 @@
 #
 ####################################################################################
 
+from numpy import log
+
 class Gafney:
     def __init__(self):
         self.p = 0.6288
@@ -65,5 +67,23 @@ class SLIM:
     def solve_for_t_d(self):
         # t_d = (S / (C * K^p)) ** (1/q)
         k_p = self.K ** self.func.p
-        inverse_q  = 1/self.q
+        inverse_q  = 1/self.func.q
         return (self.S / (self.C * k_p)) ** inverse_q
+    
+    def solve_for_q(self):
+        # q = ln(S / (C * K^p)) / ln(t_d)
+        k_p = self.K ** self.func.p
+        isolated_var = self.S / (self.C * k_p)
+        ln_iso_var = log(isolated_var)
+        ln_t_d = log(self.t_d)
+
+        return (ln_iso_var / ln_t_d)
+    
+    def solve_for_p(self):
+        # p = ln(S / (C * t_d^q)) / ln(k)
+        td_q = self.t_d ** self.func.q
+        isolated_var = self.S / (self.C * td_q)
+        ln_iso_var = log(isolated_var)
+        ln_k = log(self.K)
+
+        return (ln_iso_var / ln_k)
