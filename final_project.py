@@ -22,6 +22,9 @@ from Data_Fitting import Model_Fitting
 from json import load
 from Model_Types.COCOMO import COCOMO_ENUM, COCOMO
 from Model_Types.SLIM import SLIM
+from random import randint, random
+from math import ceil
+from Generation import create_excel
 
 def main():
     with open('data.json', 'r') as data_file:
@@ -80,42 +83,104 @@ def main():
 
     ## Run the analysis at least once 
     p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
-              total_src_code, total_dev_time, total_effort, slim_proj_dict, data, project_string)
+              total_src_code, total_dev_time, total_effort, slim_proj_dict)
     
     iter = 0
     best_p = p
     best_q = q
     best_c = c
     
-    while(iter < 100):
+    # try:
+    #     while(iter < 50):
 
-        all_effort, all_dev_time, all_c, data_array_temp, data_array, \
-        total_src_code, total_dev_time, total_effort  = get_new_total_values(data, project_string, slim_proj_dict)
+    #         all_effort, all_dev_time, all_c, data_array_temp, data_array, \
+    #         total_src_code, total_dev_time, total_effort  = get_new_total_values(slim_proj_dict)
 
-        p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
-              total_src_code, total_dev_time, total_effort, slim_proj_dict, data, project_string)
-        
-        if(p > best_p and q > best_q and c > best_c):
-            best_p = p
-            best_q = q
-            best_c = c
-        
-        iter +=1
+    #         p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
+    #             total_src_code, total_dev_time, total_effort, slim_proj_dict)
+            
+    #         if(p > best_p and q > best_q and c > best_c):
+    #             best_p = p
+    #             best_q = q
+    #             best_c = c
+            
+    #         iter +=1
+    # except:
+    #     print("Couldn't Calculate, using last known P and Q values")
 
-    print("Best P value found: {}, Best Q value found: {}, and Best Company Tech Const was: {}".format(best_p, best_q, best_c))
-    print("-----------------------------")
-    for proj in data[project_string]:
+    # for proj in data[project_string]:
 
-        slim_proj_dict[proj].C = best_c
-        slim_proj_dict[proj].func.p = best_p
-        slim_proj_dict[proj].func.q = best_q
+    #     slim_proj_dict[proj].C = best_c
+    #     slim_proj_dict[proj].func.p = best_p
+    #     slim_proj_dict[proj].func.q = best_q
+    #     slim_proj_dict[proj].K = round(slim_proj_dict[proj].solve_for_K(), 4)
+    
+    num_entries = 20
 
-        print(round(slim_proj_dict[proj].solve_for_K(), 4))
+    generate_new_data(best_c, best_p, best_q, slim_proj_dict , num_entries, total_src_code, total_dev_time)
 
-def get_new_total_values(data, project_string, slim_proj_dict):
+    iter = 0
+    try:
+
+        while(iter < 50):
+
+            all_effort, all_dev_time, all_c, data_array_temp, data_array, \
+            total_src_code, total_dev_time, total_effort  = get_new_total_values(slim_proj_dict)
+
+            p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
+                total_src_code, total_dev_time, total_effort, slim_proj_dict)
+            
+            if(p > best_p and q > best_q and c > best_c):
+
+                print(p, q, c)
+                best_p = p
+                best_q = q
+                best_c = c
+            
+            iter +=1
+    except:
+        print("Couldn't Calculate, using last known P and Q values")
+
+    for proj in slim_proj_dict.values():
+
+        proj.C = best_c
+        proj.func.p = best_p
+        proj.func.q = best_q
+        proj.K = round(proj.solve_for_K(), 4)
+
+
+
+    createEx = create_excel.CreateSlimExcel(slim_proj_dict)
+
+def generate_new_data(best_c, best_p, best_q, slim_proj_dict, num_entries, total_src_code, total_dev_time):
+    
+    lowerLimit = 45000 
+    upperLimit = 900000
+
+    ratio = total_dev_time / total_src_code
+    itr = 1
+
+    while num_entries > 0 and ratio != 0:
+        project = "project{}".format(itr)
+
+        slim_proj_dict[project] = SLIM()
+        slim_proj_dict[project].S = int(ceil(randint(lowerLimit, upperLimit) / 100.0)) * 100
+        slim_proj_dict[project].t_d = round((ratio* slim_proj_dict[project].S), 2) 
+
+        slim_proj_dict[project].func.p =  best_p
+        slim_proj_dict[project].func.q =  best_q
+        slim_proj_dict[project].C =  best_c
+
+        slim_proj_dict[project].K = round(slim_proj_dict[project].solve_for_K(),4)
+
+
+        #print("{}, S = {}, t_d = {}, K = {}".format(project, slim_proj_dict[project].S, slim_proj_dict[project].t_d, slim_proj_dict[project].K))
+
+        itr += 1
+        num_entries -=1
+
+def get_new_total_values(slim_proj_dict):
     '''
-    @param data             - JSON Dictionary of all the values
-    @param project_string   - JSON project string
     @param slim_proj_dict   - dictionary of SLIM models
 
     @return all_effort      - Lists of all projects Effort
@@ -140,28 +205,26 @@ def get_new_total_values(data, project_string, slim_proj_dict):
     total_dev_time  = 0
     total_effort    = 0 
 
-    for proj in data[project_string]:
+    for proj in slim_proj_dict.values():
 
-        data_array.append((slim_proj_dict[proj].S,slim_proj_dict[proj].t_d))
-        data_array_temp.append((slim_proj_dict[proj].K, slim_proj_dict[proj].t_d))
-        all_effort.append(slim_proj_dict[proj].K)
-        all_dev_time.append(slim_proj_dict[proj].t_d)
+        data_array.append((proj.S,proj.t_d))
+        data_array_temp.append((proj.K, proj.t_d))
+        all_effort.append(proj.K)
+        all_dev_time.append(proj.t_d)
 
-        total_src_code += slim_proj_dict[proj].S
-        total_dev_time += slim_proj_dict[proj].t_d
-        total_effort   += slim_proj_dict[proj].K
+        total_src_code += proj.S
+        total_dev_time += proj.t_d
+        total_effort   += proj.K
 
-        all_c.append((slim_proj_dict[proj].S / slim_proj_dict[proj].C))
+        all_c.append(proj.S / proj.C)
 
     return all_effort, all_dev_time, all_c, data_array_temp, data_array, \
             total_src_code, total_dev_time, total_effort
 
 def run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
-              total_src_code, total_dev_time, total_effort, slim_proj_dict, data, project_string):
+              total_src_code, total_dev_time, total_effort, slim_proj_dict):
     '''
     @param env_mode        - Whether we are running Gafney or Putnam
-    @param data            - JSON Dictionary of all the values
-    @param project_string  - JSON project string
     @param slim_proj_dict  - dictionary of SLIM models
     @param all_effort      - Lists of all projects Effort
     @param all_dev_time    - Lists of all project development time
@@ -224,9 +287,9 @@ def run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, dat
     newAvgQ = round(sum(newQs) / len(newQs), 4)
 
     # Get the Average values for all projects to get an overall C value
-    SLOC_avg     = total_src_code / len(data[project_string])
-    dev_time_avg = total_dev_time / len(data[project_string])
-    effort_avg   = total_effort   / len(data[project_string])
+    SLOC_avg     = total_src_code / len(slim_proj_dict)
+    dev_time_avg = total_dev_time / len(slim_proj_dict)
+    effort_avg   = total_effort   / len(slim_proj_dict)
 
     # Plug in Values into SLIM as if it where a solo project
     temp_SLIM.S = SLOC_avg
@@ -238,17 +301,18 @@ def run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, dat
     # Solve for the company C value
     tempC = round(temp_SLIM.solve_for_constant(), 4)
 
-    for proj in data[project_string]:
+    for proj in slim_proj_dict.values():
 
         # Insert the New P, Q, and C values into all project and revaluate the effort
-        slim_proj_dict[proj].func.p = newAvgP
-        slim_proj_dict[proj].func.q = newAvgQ
-        slim_proj_dict[proj].C = tempC
+        proj.func.p = newAvgP
+        proj.func.q = newAvgQ
+        proj.C = tempC
 
         # insert new Technology Constant
-        slim_proj_dict[proj].K = slim_proj_dict[proj].solve_for_K()
+        proj.K = proj.solve_for_K()
 
     return newAvgP, newAvgQ, tempC
+
 if __name__ == '__main__':
 
     main()

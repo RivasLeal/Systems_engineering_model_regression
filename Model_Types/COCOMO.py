@@ -16,6 +16,7 @@
 ####################################################################################
 
 from enum import Enum
+from numpy import log
 
 class COCOMO_ENUM(Enum):
     UNDEFINED = 0
@@ -51,5 +52,44 @@ class COCOMO:
         else:
             raise ValueError("Invalid Model Type")
         
-        self.effort_months = self.a * (KDSI ** self.b)
-        self.dev_time_months = self.c * (self.effort_months ** self.d)
+        # Delivery source instructions in thousands
+        self.KDSI = KDSI
+        
+        self.effort_months = self.solve_for_effort_months()
+        self.dev_time_months = self.solve_for_dev_time_months()
+
+    def solve_for_a(self):
+        """
+        a = K / (SLOC^b)
+        """
+        return (self.effort_months / (self.KDSI ** self.b))
+
+    def solve_for_b(self):
+        """
+        b = ln(K/a) / ln(SLOC)
+        """
+        return log(self.effort_months / self.a) / log(self.KDSI)
+    
+    def solve_for_c(self):
+        """
+        c = Dev_time_Months / (Effort_Months ^ d)
+        """
+        return (self.dev_time_months / (self.effort_months ** self.d))
+
+    def solve_for_d(self):
+        """
+        d = ln(Dev_time_Months/c) / ln(Effort_Months)
+        """
+        return log(self.dev_time_months / self.c) / log(self.effort_months)
+
+    def solve_for_effort_months(self):
+        """
+        Effort_Months = a * (KDSI^b)
+        """
+        return self.a * (self.KDSI ** self.b)
+    
+    def solve_for_dev_time_months(self):
+        """
+        Dev_time_Months = c * (Effort_Months ^ d)
+        """
+        return self.c * (self.effort_months ** self.d)

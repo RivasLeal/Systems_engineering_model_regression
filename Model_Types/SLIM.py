@@ -64,11 +64,22 @@ class SLIM:
         inverse_p  = 1/self.func.p
         return (self.S / (self.C * t_d_q)) ** inverse_p
     
+    def solve_for_K_p(self):
+        # K^p = (S / (C * t_d^q))
+        t_d_q = self.t_d ** self.func.q
+        return (self.S / (self.C * t_d_q))
+    
     def solve_for_t_d(self):
         # t_d = (S / (C * K^p)) ** (1/q)
         k_p = self.K ** self.func.p
         inverse_q  = 1/self.func.q
         return (self.S / (self.C * k_p)) ** inverse_q
+    
+    def solve_for_t_d_q(self):
+        # t_d^q = (S / (C * K^p))
+        k_p = self.K ** self.func.p
+        inverse_q  = 1/self.func.q
+        return (self.S / (self.C * k_p))
     
     def solve_for_q(self):
         # q = ln(S / (C * K^p)) / ln(t_d)
