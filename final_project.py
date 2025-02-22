@@ -22,7 +22,7 @@ from Data_Fitting import Model_Fitting
 from json import load
 from Model_Types.COCOMO import COCOMO_ENUM, COCOMO
 from Model_Types.SLIM import SLIM
-from random import randint, random
+from random import randint, uniform
 from math import ceil
 from Generation import create_excel
 
@@ -45,6 +45,7 @@ def main():
     all_effort = []
     all_dev_time = []
     all_c = []
+    all_C = []
     slim_proj_dict  = dict()
 
     # Sum of all projects
@@ -62,67 +63,39 @@ def main():
         sloc = data[project_string][proj][sloc_string]
         dev_time = data[project_string][proj][dev_time_string]
         eff = data[project_string][proj][effort_string]
+        slim_proj_dict[proj] = SLIM(env_mode)
 
         data_array.append((sloc,dev_time))
         data_array_temp.append((eff, dev_time))
         all_effort.append(eff)
         all_dev_time.append(dev_time)
 
-        slim_proj_dict[proj] = SLIM(env_mode)
-
         slim_proj_dict[proj].S = sloc
         slim_proj_dict[proj].K = eff
         slim_proj_dict[proj].t_d = dev_time
         slim_proj_dict[proj].C = slim_proj_dict[proj].solve_for_constant()
 
+        all_C.append(slim_proj_dict[proj].C)
         all_c.append((sloc / slim_proj_dict[proj].C))
 
         total_src_code += sloc
         total_dev_time += dev_time
         total_effort   += eff
 
-    ## Run the analysis at least once 
-    p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
-              total_src_code, total_dev_time, total_effort, slim_proj_dict)
+    temp = SLIM(env_mode)
+    if(True):
+        num_entries = 5
+
+        generate_new_data((sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict , num_entries, total_src_code, total_dev_time) 
     
     iter = 0
-    best_p = p
-    best_q = q
-    best_c = c
-    
-    # try:
-    #     while(iter < 50):
+    best_p = temp.func.p
+    best_q = temp.func.q
+    best_c = (sum(all_C) / len(all_C))
 
-    #         all_effort, all_dev_time, all_c, data_array_temp, data_array, \
-    #         total_src_code, total_dev_time, total_effort  = get_new_total_values(slim_proj_dict)
-
-    #         p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
-    #             total_src_code, total_dev_time, total_effort, slim_proj_dict)
-            
-    #         if(p > best_p and q > best_q and c > best_c):
-    #             best_p = p
-    #             best_q = q
-    #             best_c = c
-            
-    #         iter +=1
-    # except:
-    #     print("Couldn't Calculate, using last known P and Q values")
-
-    # for proj in data[project_string]:
-
-    #     slim_proj_dict[proj].C = best_c
-    #     slim_proj_dict[proj].func.p = best_p
-    #     slim_proj_dict[proj].func.q = best_q
-    #     slim_proj_dict[proj].K = round(slim_proj_dict[proj].solve_for_K(), 4)
-    
-    num_entries = 20
-
-    generate_new_data(best_c, best_p, best_q, slim_proj_dict , num_entries, total_src_code, total_dev_time)
-
-    iter = 0
     try:
 
-        while(iter < 50):
+        while(iter < 1000):
 
             all_effort, all_dev_time, all_c, data_array_temp, data_array, \
             total_src_code, total_dev_time, total_effort  = get_new_total_values(slim_proj_dict)
@@ -132,7 +105,6 @@ def main():
             
             if(p > best_p and q > best_q and c > best_c):
 
-                print(p, q, c)
                 best_p = p
                 best_q = q
                 best_c = c
@@ -165,13 +137,21 @@ def generate_new_data(best_c, best_p, best_q, slim_proj_dict, num_entries, total
 
         slim_proj_dict[project] = SLIM()
         slim_proj_dict[project].S = int(ceil(randint(lowerLimit, upperLimit) / 100.0)) * 100
-        slim_proj_dict[project].t_d = round((ratio* slim_proj_dict[project].S), 2) 
+
+        estimated_development_time = (ratio* slim_proj_dict[project].S)
+        variance = 0
+        
+        while variance == 0:
+           variance = 1 + uniform(-0.10,0.10)
+
+        slim_proj_dict[project].t_d = round(estimated_development_time, 2) 
 
         slim_proj_dict[project].func.p =  best_p
         slim_proj_dict[project].func.q =  best_q
+
         slim_proj_dict[project].C =  best_c
 
-        slim_proj_dict[project].K = round(slim_proj_dict[project].solve_for_K(),4)
+        slim_proj_dict[project].K = round(slim_proj_dict[project].solve_for_K() * variance,4)
 
 
         #print("{}, S = {}, t_d = {}, K = {}".format(project, slim_proj_dict[project].S, slim_proj_dict[project].t_d, slim_proj_dict[project].K))
