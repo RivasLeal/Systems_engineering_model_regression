@@ -15,14 +15,13 @@
 #
 ####################################################################################
 
-# TODO
+# TODO add argv to allow user to specify JSON and type of model
 # from sys import argv
-from numpy import array, var, log
-from Data_Creation import Curve_plot
+from numpy import log
+from Data_Fitting import Model_Fitting
 from json import load
 from Model_Types.COCOMO import COCOMO_ENUM, COCOMO
 from Model_Types.SLIM import SLIM
-from math import e
 
 def main():
     with open('data.json', 'r') as data_file:
@@ -79,32 +78,55 @@ def main():
         total_dev_time += dev_time
         total_effort   += eff
 
-    temp_SLIM = SLIM(env_mode)
-
-    p, q, c = temp_func(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
+    ## Run the analysis at least once 
+    p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
               total_src_code, total_dev_time, total_effort, slim_proj_dict, data, project_string)
     
     iter = 0
-
-    init_C = c
+    best_p = p
+    best_q = q
+    best_c = c
     
-    while((p <= temp_SLIM.func.p or q <=temp_SLIM.func.q or c < init_C) and iter < 100):
+    while(iter < 100):
 
         all_effort, all_dev_time, all_c, data_array_temp, data_array, \
         total_src_code, total_dev_time, total_effort  = get_new_total_values(data, project_string, slim_proj_dict)
 
-        p, q, c = temp_func(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
+        p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
               total_src_code, total_dev_time, total_effort, slim_proj_dict, data, project_string)
+        
+        if(p > best_p and q > best_q and c > best_c):
+            best_p = p
+            best_q = q
+            best_c = c
         
         iter +=1
 
-    print(iter, p, q)
+    print("Best P value found: {}, Best Q value found: {}, and Best Company Tech Const was: {}".format(best_p, best_q, best_c))
     print("-----------------------------")
     for proj in data[project_string]:
-        print(round(slim_proj_dict[proj].K, 4))
+
+        slim_proj_dict[proj].C = best_c
+        slim_proj_dict[proj].func.p = best_p
+        slim_proj_dict[proj].func.q = best_q
+
+        print(round(slim_proj_dict[proj].solve_for_K(), 4))
 
 def get_new_total_values(data, project_string, slim_proj_dict):
+    '''
+    @param data             - JSON Dictionary of all the values
+    @param project_string   - JSON project string
+    @param slim_proj_dict   - dictionary of SLIM models
 
+    @return all_effort      - Lists of all projects Effort
+    @return all_dev_time    - Lists of all project development time
+    @return all_c           - Lists of all projects technology constant
+    @return data_array_temp - 2D list containing Effort and development time for each project
+    @return data_array      - 2D list Source Lines of Code and development time for each project
+    @return total_src_code  - Total number of source code throughout all projects
+    @return total_dev_time  - Total number of development time throughout all projects
+    @return total_effort    - Total number of effort throughout all projects
+    '''
     # Storage of the data
     data_array = []
     data_array_temp = []
@@ -134,14 +156,32 @@ def get_new_total_values(data, project_string, slim_proj_dict):
     return all_effort, all_dev_time, all_c, data_array_temp, data_array, \
             total_src_code, total_dev_time, total_effort
 
-def temp_func(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
+def run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
               total_src_code, total_dev_time, total_effort, slim_proj_dict, data, project_string):
+    '''
+    @param env_mode        - Whether we are running Gafney or Putnam
+    @param data            - JSON Dictionary of all the values
+    @param project_string  - JSON project string
+    @param slim_proj_dict  - dictionary of SLIM models
+    @param all_effort      - Lists of all projects Effort
+    @param all_dev_time    - Lists of all project development time
+    @param all_c           - Lists of all projects technology constant
+    @param data_array_temp - 2D list containing Effort and development time for each project
+    @param data_array      - 2D list Source Lines of Code and development time for each project
+    @param total_src_code  - Total number of source code throughout all projects
+    @param total_dev_time  - Total number of development time throughout all projects
+    @param total_effort    - Total number of effort throughout all projects
+
+    @return newAvgP - New Calculated P value
+    @return newAvgQ - New Calculated Q value
+    @return tempC   - New Calculated Technology Constant value
+    '''
     temp_SLIM = SLIM(env_mode)
 
     # Create a COCOMO ENUM of UNDEFINED
     cocomo_enum = COCOMO_ENUM(0)
 
-    cur_pl = Curve_plot.DataStorage()
+    cur_pl = Model_Fitting.Model_Fitting()
 
     # Fit the Data into a linear model
     a, b = cur_pl.fit_exponential_equation(all_effort, all_dev_time, all_c)
@@ -205,6 +245,7 @@ def temp_func(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_a
         slim_proj_dict[proj].func.q = newAvgQ
         slim_proj_dict[proj].C = tempC
 
+        # insert new Technology Constant
         slim_proj_dict[proj].K = slim_proj_dict[proj].solve_for_K()
 
     return newAvgP, newAvgQ, tempC
