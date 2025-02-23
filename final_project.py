@@ -39,6 +39,8 @@ def main(args):
     labor_hours_string = "Labor Hours in a Month"
     env_mode_string = "Environment Mode"
     gener_iter = "Generation Iterations"
+    min_sloc = "Min SLOC Generation"
+    max_sloc = "MAX SLOC Generation"
 
     # Storage of the data
     data_array = []
@@ -94,10 +96,12 @@ def main(args):
 
     temp = SLIM(env_mode)
     if(len(args) > 1):
-        print("Generating: {} data points".format(args[1]))
-        num_entries = 5
-        generate_new_data((sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict , num_entries, total_src_code, total_dev_time)
-    
+        try:
+            num_entries = int(args[1])
+            print("Generating: {} data points".format(args[1]))
+            generate_new_data(min_sloc, max_sloc, (sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict , num_entries, total_src_code, total_dev_time)
+        except:
+            print("Not a valid int")
     iter = 0
     iter_limit = data[gener_iter]
 
@@ -153,10 +157,20 @@ def main(args):
     if(len(args) > 2):
         createEx = create_excel.CreateSlimExcel(slim_proj_dict, args[2])
 
-def generate_new_data(best_c, best_p, best_q, slim_proj_dict, num_entries, total_src_code, total_dev_time):
+    print("New P: {}, New Q: {}".format(best_p, best_q))
+
+def generate_new_data(min_sloc, max_sloc, best_c, best_p, best_q, slim_proj_dict, num_entries, total_src_code, total_dev_time):
     
-    lowerLimit = 45000 
-    upperLimit = 900000
+    try:
+        lowerLimit = int(min_sloc)
+    except:
+        lowerLimit = 45000
+        print("Lower Limit couldn't be read in, using 45000")
+    try:
+        upperLimit = int(max_sloc)
+    except:
+        upperLimit = 900000
+        print("Upper Limit couldn't be read in, using 900000")
 
     ratio = total_dev_time / total_src_code
     itr = 1
