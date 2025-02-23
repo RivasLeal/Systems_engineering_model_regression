@@ -99,7 +99,7 @@ def main(args):
         try:
             num_entries = int(args[1])
             print("Generating: {} data points".format(args[1]))
-            generate_new_data(min_sloc, max_sloc, (sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict , num_entries, total_src_code, total_dev_time)
+            generate_new_data(data[min_sloc], data[max_sloc], (sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict , num_entries, total_src_code, total_dev_time)
         except:
             print("Not a valid int")
     iter = 0
