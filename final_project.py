@@ -122,8 +122,8 @@ def main(args):
                 total_src_code, total_dev_time, total_effort, slim_proj_dict)
             
             if(c > best_c):
-                best_p = p
                 best_q = q
+                best_p = p
                 best_c = c
             
             iter +=1
