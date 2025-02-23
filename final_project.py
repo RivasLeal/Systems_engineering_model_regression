@@ -15,8 +15,7 @@
 #
 ####################################################################################
 
-# TODO add argv to allow user to specify JSON and type of model
-# from sys import argv
+from sys import argv
 from numpy import log
 from Data_Fitting import Model_Fitting
 from json import load
@@ -26,8 +25,10 @@ from random import randint, uniform
 from math import ceil
 from Generation import create_excel
 
-def main():
-    with open('data.json', 'r') as data_file:
+def main(args):
+    
+    # First Argument is the Data JSON File
+    with open(r'{}'.format(args[0]), 'r') as data_file:
         data = load(data_file)
 
     # Sections Found in the JSON
@@ -37,6 +38,7 @@ def main():
     effort_string = "Effort"
     labor_hours_string = "Labor Hours in a Month"
     env_mode_string = "Environment Mode"
+    gener_iter = "Generation Iterations"
 
     # Storage of the data
     data_array = []
@@ -57,6 +59,11 @@ def main():
     labor_hours_to_months  = data[labor_hours_string]
     env_mode = data[env_mode_string]
 
+    # Create a COCOMO ENUM of UNDEFINED
+    cocomo_enum = COCOMO_ENUM.UNDEFINED
+    cocomo_enum = cocomo_enum.get_model_type_from_string(env_mode)
+    cocomo_proj_dict  = dict()
+
     # Iterate throught all Projects
     for proj in data[project_string]:
         # Get Values from the json
@@ -64,6 +71,9 @@ def main():
         dev_time = data[project_string][proj][dev_time_string]
         eff = data[project_string][proj][effort_string]
         slim_proj_dict[proj] = SLIM(env_mode)
+
+        # Convert SLOC -> KSLOC
+        cocomo_proj_dict[proj] = COCOMO((sloc / (10**3)), cocomo_enum)
 
         data_array.append((sloc,dev_time))
         data_array_temp.append((eff, dev_time))
@@ -83,20 +93,24 @@ def main():
         total_effort   += eff
 
     temp = SLIM(env_mode)
-    if(True):
+    if(len(args) > 1):
+        print("Generating: {} data points".format(args[1]))
         num_entries = 5
-
-        generate_new_data((sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict , num_entries, total_src_code, total_dev_time) 
+        generate_new_data((sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict , num_entries, total_src_code, total_dev_time)
     
     iter = 0
+    iter_limit = data[gener_iter]
+
+    # Make sure it cant be non zero
+    if(iter_limit < 1):
+        iter_limit = 100
+    
     best_p = temp.func.p
     best_q = temp.func.q
     best_c = (sum(all_C) / len(all_C))
 
     try:
-
-        while(iter < 1000):
-
+        while(iter < iter_limit):
             all_effort, all_dev_time, all_c, data_array_temp, data_array, \
             total_src_code, total_dev_time, total_effort  = get_new_total_values(slim_proj_dict)
 
@@ -111,7 +125,7 @@ def main():
             
             iter +=1
     except:
-        print("Couldn't Calculate, using last known P and Q values")
+        print("Couldn't continue calculating, using last known P and Q values")
 
     for proj in slim_proj_dict.values():
 
@@ -120,9 +134,24 @@ def main():
         proj.func.q = best_q
         proj.K = round(proj.solve_for_K(), 4)
 
+    # for key, val in cocomo_proj_dict.items():
 
+    #     print("slim_k: ",  (slim_proj_dict[key].K * 12))
+    #     print("slim_t_d: ", (slim_proj_dict[key].solve_for_t_d() * 12))
 
-    createEx = create_excel.CreateSlimExcel(slim_proj_dict)
+    #     print("coco_k: ",  cocomo_proj_dict[key].effort_months)
+    #     print("coco_t_d: ", cocomo_proj_dict[key].dev_time_months)
+
+    #     cocomo_proj_dict[key].effort_months   = (slim_proj_dict[key].K * 12)
+    #     cocomo_proj_dict[key].dev_time_months = (slim_proj_dict[key].solve_for_t_d() * 12)
+
+    #     print("a: ", cocomo_proj_dict[key].solve_for_a())
+    #     print("b: ", cocomo_proj_dict[key].solve_for_b())
+
+    #     print("--------------------------------------------")
+ 
+    if(len(args) > 2):
+        createEx = create_excel.CreateSlimExcel(slim_proj_dict, args[2])
 
 def generate_new_data(best_c, best_p, best_q, slim_proj_dict, num_entries, total_src_code, total_dev_time):
     
@@ -152,9 +181,6 @@ def generate_new_data(best_c, best_p, best_q, slim_proj_dict, num_entries, total
         slim_proj_dict[project].C =  best_c
 
         slim_proj_dict[project].K = round(slim_proj_dict[project].solve_for_K() * variance,4)
-
-
-        #print("{}, S = {}, t_d = {}, K = {}".format(project, slim_proj_dict[project].S, slim_proj_dict[project].t_d, slim_proj_dict[project].K))
 
         itr += 1
         num_entries -=1
@@ -220,9 +246,6 @@ def run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, dat
     @return tempC   - New Calculated Technology Constant value
     '''
     temp_SLIM = SLIM(env_mode)
-
-    # Create a COCOMO ENUM of UNDEFINED
-    cocomo_enum = COCOMO_ENUM(0)
 
     cur_pl = Model_Fitting.Model_Fitting()
 
@@ -295,4 +318,7 @@ def run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, dat
 
 if __name__ == '__main__':
 
-    main()
+    if(len(argv) < 2):
+        print("Missing Argument")
+    else:
+        main(argv[1:])
