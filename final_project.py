@@ -136,22 +136,6 @@ def main(args):
         proj.func.p = best_p
         proj.func.q = best_q
         proj.K = round(proj.solve_for_K(), 4)
-
-    # for key, val in cocomo_proj_dict.items():
-
-    #     print("slim_k: ",  (slim_proj_dict[key].K * 12))
-    #     print("slim_t_d: ", (slim_proj_dict[key].solve_for_t_d() * 12))
-
-    #     print("coco_k: ",  cocomo_proj_dict[key].effort_months)
-    #     print("coco_t_d: ", cocomo_proj_dict[key].dev_time_months)
-
-    #     cocomo_proj_dict[key].effort_months   = (slim_proj_dict[key].K * 12)
-    #     cocomo_proj_dict[key].dev_time_months = (slim_proj_dict[key].solve_for_t_d() * 12)
-
-    #     print("a: ", cocomo_proj_dict[key].solve_for_a())
-    #     print("b: ", cocomo_proj_dict[key].solve_for_b())
-
-    #     print("--------------------------------------------")
  
     if(len(args) > 2):
         createEx = create_excel.CreateSlimExcel(slim_proj_dict, args[2])
