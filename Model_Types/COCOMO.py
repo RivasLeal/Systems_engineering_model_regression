@@ -31,6 +31,8 @@ class COCOMO_ENUM(Enum):
             return COCOMO_ENUM.EMBEDDED
         if enumString.lower() == "semidetached":
             return COCOMO_ENUM.SEMIDETACHED
+        else:
+            return COCOMO_ENUM.UNDEFINED
 
 class COCOMO:
     def __init__(self, KDSI, model_type):
@@ -51,6 +53,7 @@ class COCOMO:
             self.d = 0.32
         else:
             raise ValueError("Invalid Model Type")
+            return
         
         # Delivery source instructions in thousands
         self.KDSI = KDSI

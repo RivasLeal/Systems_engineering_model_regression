@@ -19,8 +19,10 @@ from xlsxwriter.workbook import Workbook
 from numpy import var
 
 class CreateSlimExcel:
-    def __init__(self, proj_dict):
-        workbook = Workbook(r"C:\Users\Rivas\Desktop\Coding\Python\repository\Systems_engineering_model_regression\UpdatedHistoricalData.xlsx")
+    def __init__(self, proj_dict, location):
+
+        file_loc = location + "UpdatedHistoricalData.xlsx"
+        workbook = Workbook(r"{}".format(file_loc))
         worksheet = workbook.add_worksheet("FIT Historical Performance")
 
         # Create Formatter
