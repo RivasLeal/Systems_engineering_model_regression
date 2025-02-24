@@ -14,7 +14,7 @@
 #
 #
 ####################################################################################
-#test
+
 from sys import argv
 from numpy import log
 from Data_Fitting import Model_Fitting
@@ -282,14 +282,14 @@ def plot_cocomo_data(data, tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_pred
     slocs = klocs * 1000
 
     plot_data = [
-        (slocs, [tuned_a] * len(slocs), "SLOC vs COCOMO(a)", "SLOC", "COCOMO(a)", "cocomo_sloc_a.png"),
-        (slocs, [tuned_b] * len(slocs), "SLOC vs COCOMO(b)", "SLOC", "COCOMO(b)", "cocomo_sloc_b.png"),
-        (slocs, [tuned_c] * len(slocs), "SLOC vs COCOMO(c)", "SLOC", "COCOMO(c)", "cocomo_sloc_c.png"),
-        (slocs, efforts, "SLOC vs Effort (Labor Yrs)", "SLOC", "Effort (Labor Yrs)", "cocomo_sloc_effort.png"),
-        (slocs, dev_times, "SLOC vs Dev Time (Yrds) t_d", "SLOC", "Dev Time (Yrds) t_d", "cocomo_sloc_devtime.png"),
-        (slocs, tuned_effort_prediction, "SLOC vs Predicted Effort", "SLOC", "Predicted Effort", "cocomo_sloc_predicted_effort.png"),
-        (slocs, tuned_time_prediction, "SLOC vs Predicted Time", "SLOC", "Predicted Time", "cocomo_sloc_predicted_time.png"),
-    ]
+    (slocs, efforts, "SLOC vs Effort (Labor Yrs)", "SLOC", "Effort (Labor Yrs)", "cocomo_sloc_effort.png"),
+    (slocs, dev_times, "SLOC vs Dev Time (Yrs) t_d", "SLOC", "Dev Time (Yrs) t_d", "cocomo_sloc_devtime.png"),
+    (slocs, tuned_effort_prediction, "SLOC vs Predicted Effort", "SLOC", "Predicted Effort", "cocomo_sloc_predicted_effort.png"),
+    (slocs, tuned_time_prediction, "SLOC vs Predicted Time", "SLOC", "Predicted Time", "cocomo_sloc_predicted_time.png"),
+    (slocs, [tuned_a] * len(slocs), "SLOC vs COCOMO(a)", "SLOC", "COCOMO(a)", "cocomo_sloc_a.png"),
+    (slocs, [tuned_b] * len(slocs), "SLOC vs COCOMO(b)", "SLOC", "COCOMO(b)", "cocomo_sloc_b.png"),
+    (slocs, [tuned_c] * len(slocs), "SLOC vs COCOMO(c)", "SLOC", "COCOMO(c)", "cocomo_sloc_c.png"),
+]
 
     try:
         workbook = load_workbook(excel_file_path)
@@ -302,14 +302,25 @@ def plot_cocomo_data(data, tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_pred
 
     temp_image_files = []
 
+    # Calculate regression lines OUTSIDE the loop
+    coefficients_effort = np.polyfit(slocs, tuned_effort_prediction, 1)
+    poly_effort = np.poly1d(coefficients_effort)
+
+    coefficients_time = np.polyfit(slocs, tuned_time_prediction, 1)
+    poly_time = np.poly1d(coefficients_time)
+
     for i, (x, y, title, xlabel, ylabel, filename) in enumerate(plot_data):
         plt.figure(figsize=(8, 6))
-        plt.scatter(x, y, label="Data Points")
+        plt.scatter(x, y, label="Data Points", s=20)
 
-        # Calculate regression line
-        coefficients = np.polyfit(x, y, 1)
-        poly = np.poly1d(coefficients)
-        plt.plot(x, poly(x), color='red', label="Best Fit Line", linewidth=2)
+        if title == "SLOC vs Predicted Effort":
+            plt.plot(x, poly_effort(x), color='red', label="Best Fit Line", linewidth=1)
+        elif title == "SLOC vs Predicted Time":
+            plt.plot(x, poly_time(x), color='red', label="Best Fit Line", linewidth=1)
+        else:
+            coefficients = np.polyfit(x, y, 1)
+            poly = np.poly1d(coefficients)
+            plt.plot(x, poly(x), color='red', label="Best Fit Line", linewidth=1)
 
         plt.title(title)
         plt.xlabel(xlabel)
@@ -317,9 +328,8 @@ def plot_cocomo_data(data, tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_pred
         plt.legend()
         plt.grid(True)
 
-        # Limit y-axis range for SLOC vs. Dev Time
         if title == "SLOC vs Dev Time (Yrds) t_d":
-            plt.ylim(0, 10)  # Set y-axis limits to 0-10 years
+            plt.ylim(0, 10)
 
         plt.savefig(filename)
         plt.close()
@@ -403,23 +413,23 @@ def generate_cocomo_data(min_sloc, max_sloc, num_entries, total_effort, total_de
     if num_entries <= 0:
         return {"Projects": {}}
 
-    effort_ratio = total_effort / num_entries
-    time_ratio = total_dev_time / num_entries
-
     cocomo_data = {"Projects": {}}
     for i in range(1, num_entries + 1):
         project_name = f"project{i}"
         sloc = int(np.ceil(random.randint(lowerLimit, upperLimit) / 100.0)) * 100
 
-        # Controlled variation
-        effort_variation = random.uniform(-variation_range, variation_range)  
-        time_variation = random.uniform(-variation_range, variation_range)   
+        # Effort depends on SLOC with almost NO randomness
+        base_effort = sloc * 0.000016 # Fixed value, no randomness
+        effort_variation = random.uniform(-0.005, 0.005) # Tiny variation
+        effort = base_effort * (1 + effort_variation)
 
-        effort = round(effort_ratio * (1 + effort_variation), 2)
-        development_time = round(time_ratio * (1 + time_variation), 2)
+        # Dev Time depends on SLOC with almost NO randomness
+        base_time = sloc * 0.000008 # Fixed value, no randomness
+        time_variation = random.uniform(-0.005, 0.005) # Tiny variation
+        development_time = base_time * (1 + time_variation)
 
-        effort = max(0, effort)
-        development_time = max(0, development_time)
+        effort = max(0.1, effort)
+        development_time = max(0.1, development_time)
 
         cocomo_data["Projects"][project_name] = {
             "SLOC": sloc,
@@ -578,28 +588,33 @@ def fit_cocomo_effort(kloc_values, effort_values):
     """Fits COCOMO effort equation (Effort = a * KLOC^b) using log transformation."""
     scaler = MinMaxScaler()
     scaled_kloc = scaler.fit_transform(np.array(kloc_values).reshape(-1, 1))
-    log_kloc = np.log(np.maximum(scaled_kloc.flatten(), 1e-10))
+    log_kloc = np.log(np.maximum(scaled_kloc.flatten(), 1e-10))  # Add a small constant to avoid log(0)
+    log_effort = np.log(np.array(effort_values) + 1e-10)
 
-    log_effort = np.log(np.array(effort_values) + 1e-10)  # Add constant to avoid log(0)
-
-    effort_model = Ridge(alpha=1.0)
+    effort_model = Ridge(alpha=1.0)  # Add L2 regularization
     effort_model.fit(log_kloc.reshape(-1, 1), log_effort)
 
     b = effort_model.coef_[0]
     a = np.exp(effort_model.intercept_)
 
+    # Ensure b is positive
+    b = max(0.01, b)
+
     return a, b, effort_model.predict(log_kloc.reshape(-1, 1))
 
 def fit_cocomo_time(effort_values, time_values):
     """Fits COCOMO time equation (Time = c * Effort^d) using log transformation."""
-    log_effort = np.log(effort_values)
-    log_time = np.log(time_values)
+    log_effort = np.log(np.array(effort_values) + 1e-10)
+    log_time = np.log(np.array(time_values) + 1e-10)
 
-    time_model = LinearRegression()
+    time_model = Ridge(alpha=1.0)
     time_model.fit(log_effort.reshape(-1, 1), log_time)
 
     d = time_model.coef_[0]
     c = np.exp(time_model.intercept_)
+
+    # Ensure d is positive
+    d = max(0.01, d)
 
     return c, d, time_model.predict(log_effort.reshape(-1, 1))
 
@@ -612,17 +627,26 @@ def tune_cocomo_parameters_cocomo_aware(kloc_values, effort_values, time_values,
     best_a, best_b, best_c, best_d = nominal_a, nominal_b, nominal_c, nominal_d
     min_score = float('inf')
 
-    for a in np.linspace(nominal_a * (1 - variation_range), nominal_a * (1 + variation_range), 5):
-        for b in np.linspace(nominal_b * (1 - variation_range), nominal_b * (1 + variation_range), 5):
-            for c in np.linspace(nominal_c * (1 - variation_range), nominal_c * (1 + variation_range), 5):
-                for d in np.linspace(nominal_d * (1 - variation_range), nominal_d * (1 + variation_range), 5):
+    # Wider range for a and b, narrower for c and d
+    a_range = np.linspace(nominal_a * (1 - variation_range), nominal_a * (1 + variation_range * 2), 5)
+    b_range = np.linspace(nominal_b * (1 - variation_range), nominal_b * (1 + variation_range * 2), 5)
+    c_range = np.linspace(nominal_c * (1 - variation_range / 2), nominal_c * (1 + variation_range / 2), 5)
+    d_range = np.linspace(nominal_d * (1 - variation_range / 2), nominal_d * (1 + variation_range / 2), 5)
+
+    for a in a_range:
+        for b in b_range:
+            for c in c_range:
+                for d in d_range:
                     _, _, predicted_log_effort = fit_cocomo_effort(kloc_values, effort_values)
                     effort_variance = calculate_variance(effort_values, predicted_log_effort)
 
                     _, _, predicted_log_time = fit_cocomo_time(effort_values, time_values)
                     time_variance = calculate_variance(time_values, predicted_log_time)
 
+                    # Bias towards larger a and b, smaller c and d
                     cocomo_score = (nominal_a - a) + (nominal_b - b) + (d - nominal_d) + (c - nominal_c)
+
+                    # Strongly penalize smaller a/b and larger c/d
                     score = effort_variance + time_variance + cocomo_weight * cocomo_score
 
                     if score < min_score:
@@ -635,37 +659,26 @@ def run_cocomo_analysis(data, cocomo_enum):
     """
     Runs COCOMO analysis using the COCOMO class and model type.
     """
-    kloc_values = []
-    effort_values = []
-    time_values = []
-    cocomo_projects = {}
+    kloc_values, effort_values, time_values = load_cocomo_data(data)
+    nominal_a = 2.4 #adjust these based on the cocomo model.
+    nominal_b = 1.05
+    nominal_c = 2.5
+    nominal_d = 0.38
 
-    for proj_name, proj_data in data["Projects"].items():
-        kloc = proj_data["SLOC"] / 1000.0
-        effort = proj_data["Effort"]
-        dev_time = proj_data["Development Time"]
+    tuned_a, tuned_b, tuned_c, tuned_d = tune_cocomo_parameters_cocomo_aware(
+        kloc_values, effort_values, time_values, nominal_a, nominal_b, nominal_c, nominal_d
+    )
 
-        kloc_values.append(kloc)
-        effort_values.append(effort)
-        time_values.append(dev_time)
-
-        cocomo_projects[proj_name] = COCOMO(kloc, cocomo_enum)
-
-    # Calculate tuned coefficients using log transformation
-    tuned_a, tuned_b, log_predicted_effort = fit_cocomo_effort(np.array(kloc_values), np.array(effort_values))
-    tuned_c, tuned_d, log_predicted_time = fit_cocomo_time(np.array(effort_values), np.array(time_values))
-
-    # Calculate predicted effort and time (exponentiated)
+    log_predicted_effort = np.log(tuned_a) + tuned_b * np.log(kloc_values + 1e-10)
     tuned_effort_prediction = np.exp(log_predicted_effort)
+
+    log_predicted_time = np.log(tuned_c) + tuned_d * np.log(effort_values + 1e-10)
     tuned_time_prediction = np.exp(log_predicted_time)
 
-    # Scale effort values
     scaler = MinMaxScaler()
-    scaled_effort_values = scaler.fit_transform(np.array(tuned_effort_prediction).reshape(-1, 1)).flatten() #scale predicted values instead.
+    scaled_effort_values = scaler.fit_transform(tuned_effort_prediction.reshape(-1, 1)).flatten()
 
-    # Calculate variances using scaled effort values
     tuned_effort_variance = np.var(scaled_effort_values)
-
     tuned_time_variance = np.var(time_values)
 
     return tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_variance, tuned_time_variance, tuned_effort_prediction, tuned_time_prediction
@@ -741,7 +754,7 @@ def write_cocomo_to_excel(file_loc, tuned_a, tuned_b, tuned_c, tuned_d, tuned_ef
     worksheet.cell(row=var_row, column=start_col - 1).fill = header_fill
 
     # Columns to skip variance calculation for
-    skip_variance_cols = [start_col, start_col + 2, start_col + 3, start_col + 6]
+    skip_variance_cols = [start_col, start_col + 4, start_col + 8]
 
     for col_num in range(start_col, start_col + 10):
         if col_num in skip_variance_cols:
