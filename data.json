@@ -9,65 +9,65 @@
     {
         "Gold Star":
         {
-            "SLOC" : 51000,
-            "Development Time" : 1.25,
-            "Effort" : 0.9709
+            "SLOC" : 51300,
+            "Development Time" : 0.865,
+            "Effort" : 1.3524
         },
 
         "UniStar":
         {
             "SLOC" : 403000,
             "Development Time" : 4.25,
-            "Effort" : 8.9918
+            "Effort" : 5.9918
         },
 
         "SlipStream":
         {
             "SLOC" : 465000,
-            "Development Time" : 4.75,
-            "Effort" : 10.533
+            "Development Time" : 5.75,
+            "Effort" : 7.533
         },
 
         "Fargo":
         {
             "SLOC" : 235000,
-            "Development Time" : 2.50,
-            "Effort" : 5.9597
+            "Development Time" : 2.55,
+            "Effort" : 3.3597
         },
 
         "Sky Knight":
         {
             "SLOC" : 120000,
-            "Development Time" : 2.25,
-            "Effort" : 2.4803
+            "Development Time" : 1.95,
+            "Effort" : 2.5803
         },
 
         "Sky Line":
         {
             "SLOC" : 310000,
-            "Development Time" : 4.00,
-            "Effort" : 6.0036
+            "Development Time" : 3.68,
+            "Effort" : 6.004
         },
 
         "Deep Water":
         {
-            "SLOC" : 76000,
-            "Development Time" : 1.50,
+            "SLOC" : 76800,
+            "Development Time" : 1.10,
             "Effort" : 1.5749
         },
 
         "Brilliant Dove":
         {
             "SLOC" : 64500,
-            "Development Time" : 1.50,
-            "Effort" : 1.2543
+            "Development Time" : 1.054,
+            "Effort" : 1.0543
         },
 
         "Night Reaver":
         {
             "SLOC" : 198000,
-            "Development Time" : 2.00,
-            "Effort" : 5.5824
+            "Development Time" : 2.35,
+            "Effort" : 2.847
         }
     }
 }

@@ -130,12 +130,12 @@ def main(args):
             all_effort, all_dev_time, all_c, data_array_temp, data_array, \
                 total_src_code, total_dev_time, total_effort = get_new_total_values(slim_proj_dict)
 
-            p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array,
-                                    total_src_code, total_dev_time, total_effort, slim_proj_dict)
-
-            if (p > best_p and q > best_q and c > best_c):
-                best_p = p
+            p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
+                total_src_code, total_dev_time, total_effort, slim_proj_dict)
+            
+            if(c > best_c):
                 best_q = q
+                best_p = p
                 best_c = c
 
             iter += 1
@@ -562,10 +562,6 @@ def run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, dat
         # Insert the New P, Q, and C values into all project and revaluate the effort
         proj.func.p = newAvgP
         proj.func.q = newAvgQ
-        proj.C = tempC
-
-        # insert new Technology Constant
-        proj.K = proj.solve_for_K()
 
     return newAvgP, newAvgQ, tempC
 
