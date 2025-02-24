@@ -24,9 +24,21 @@ from Model_Types.SLIM import SLIM
 from random import randint, uniform
 from math import ceil
 from Generation import create_excel
+import numpy as np
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.preprocessing import MinMaxScaler
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Border, Side, Font, Alignment, PatternFill
+from openpyxl.utils import get_column_letter
+from openpyxl.drawing.image import Image
+import random
+import matplotlib.pyplot as plt
+import os
+
+# Define the shared variation range
+variation_range = 0.10
 
 def main(args):
-    
     # First Argument is the Data JSON File
     with open(r'{}'.format(args[0]), 'r') as data_file:
         data = load(data_file)
@@ -50,23 +62,23 @@ def main(args):
     all_dev_time = []
     all_c = []
     all_C = []
-    slim_proj_dict  = dict()
+    slim_proj_dict = dict()
 
     # Sum of all projects
-    total_src_code  = 0
-    total_dev_time  = 0
-    total_effort    = 0
+    total_src_code = 0
+    total_dev_time = 0
+    total_effort = 0
 
     # Environment Vars found in the JSON
-    labor_hours_to_months  = data[labor_hours_string]
+    labor_hours_to_months = data[labor_hours_string]
     env_mode = data[env_mode_string]
 
     # Create a COCOMO ENUM of UNDEFINED
     cocomo_enum = COCOMO_ENUM.UNDEFINED
     cocomo_enum = cocomo_enum.get_model_type_from_string(env_mode)
-    cocomo_proj_dict  = dict()
+    cocomo_proj_dict = dict()
 
-    # Iterate throught all Projects
+    # Iterate through all Projects
     for proj in data[project_string]:
         # Get Values from the json
         sloc = data[project_string][proj][sloc_string]
@@ -77,7 +89,7 @@ def main(args):
         # Convert SLOC -> KSLOC
         cocomo_proj_dict[proj] = COCOMO((sloc / (10**3)), cocomo_enum)
 
-        data_array.append((sloc,dev_time))
+        data_array.append((sloc, dev_time))
         data_array_temp.append((eff, dev_time))
         all_effort.append(eff)
         all_dev_time.append(dev_time)
@@ -92,72 +104,235 @@ def main(args):
 
         total_src_code += sloc
         total_dev_time += dev_time
-        total_effort   += eff
+        total_effort += eff
 
     temp = SLIM(env_mode)
-    if(len(args) > 1):
+    if (len(args) > 1):
         try:
             num_entries = int(args[1])
             print("Generating: {} data points".format(args[1]))
-            generate_new_data(data[min_sloc], data[max_sloc], (sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict , num_entries, total_src_code, total_dev_time)
+            generate_new_data(data[min_sloc], data[max_sloc], (sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict, num_entries, total_src_code, total_dev_time)
         except:
             print("Not a valid int")
     iter = 0
     iter_limit = data[gener_iter]
 
     # Make sure it cant be non zero
-    if(iter_limit < 1):
+    if (iter_limit < 1):
         iter_limit = 100
-    
+
     best_p = temp.func.p
     best_q = temp.func.q
     best_c = (sum(all_C) / len(all_C))
 
     try:
-        while(iter < iter_limit):
+        while (iter < iter_limit):
             all_effort, all_dev_time, all_c, data_array_temp, data_array, \
-            total_src_code, total_dev_time, total_effort  = get_new_total_values(slim_proj_dict)
+                total_src_code, total_dev_time, total_effort = get_new_total_values(slim_proj_dict)
 
-            p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array, 
-                total_src_code, total_dev_time, total_effort, slim_proj_dict)
-            
-            if(p > best_p and q > best_q and c > best_c):
+            p, q, c = run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, data_array,
+                                    total_src_code, total_dev_time, total_effort, slim_proj_dict)
 
+            if (p > best_p and q > best_q and c > best_c):
                 best_p = p
                 best_q = q
                 best_c = c
-            
-            iter +=1
+
+            iter += 1
     except:
         print("Couldn't continue calculating, using last known P and Q values")
 
     for proj in slim_proj_dict.values():
-
         proj.C = best_c
         proj.func.p = best_p
         proj.func.q = best_q
         proj.K = round(proj.solve_for_K(), 4)
 
-    # for key, val in cocomo_proj_dict.items():
+    # COCOMO Analysis
+    num_entries = int(args[1]) if len(args) > 1 else 0
+    if num_entries > 0:
+        new_cocomo_data = generate_cocomo_data(data[min_sloc], data[max_sloc], num_entries, total_effort, total_dev_time)
+        tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_variance, tuned_time_variance, tuned_effort_prediction, tuned_time_prediction = run_cocomo_analysis(new_cocomo_data, cocomo_enum)
+    else:
+        tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_variance, tuned_time_variance, tuned_effort_prediction, tuned_time_prediction = run_cocomo_analysis(data, cocomo_enum)
+    print("COCOMO Analysis:")
+    print(f"  Tuned Effort Variance: {tuned_effort_variance}")
+    print(f"  Tuned Time Variance: {tuned_time_variance}")
+    print(f"  Tuned COCOMO Coefficients: a={tuned_a}, b={tuned_b}, c={tuned_c}, d={tuned_d}")
 
-    #     print("slim_k: ",  (slim_proj_dict[key].K * 12))
-    #     print("slim_t_d: ", (slim_proj_dict[key].solve_for_t_d() * 12))
-
-    #     print("coco_k: ",  cocomo_proj_dict[key].effort_months)
-    #     print("coco_t_d: ", cocomo_proj_dict[key].dev_time_months)
-
-    #     cocomo_proj_dict[key].effort_months   = (slim_proj_dict[key].K * 12)
-    #     cocomo_proj_dict[key].dev_time_months = (slim_proj_dict[key].solve_for_t_d() * 12)
-
-    #     print("a: ", cocomo_proj_dict[key].solve_for_a())
-    #     print("b: ", cocomo_proj_dict[key].solve_for_b())
-
-    #     print("--------------------------------------------")
- 
-    if(len(args) > 2):
+    if len(args) > 2:
         createEx = create_excel.CreateSlimExcel(slim_proj_dict, args[2])
+        file_loc = args[2] + "UpdatedHistoricalData.xlsx"
 
+        # Prepare data for COCOMO Excel output
+        if num_entries > 0:
+            cocomo_data_for_excel = new_cocomo_data
+        else:
+            cocomo_data_for_excel = data
+
+        # Write COCOMO data to the same file
+        write_cocomo_to_excel(file_loc, tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_variance, tuned_time_variance, tuned_effort_prediction, tuned_time_prediction, cocomo_data_for_excel)
+
+        # Set the excel path.
+        excel_file_path = args[2] + "UpdatedHistoricalData.xlsx"  
+
+        # SLIM Plots
+        plot_slim_data(slim_proj_dict, best_c, best_p, best_q, excel_file_path)
+
+        # COCOMO Plots
+        if num_entries > 0:
+            plot_cocomo_data(new_cocomo_data, tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_prediction, tuned_time_prediction, excel_file_path)
+        else:
+            plot_cocomo_data(data, tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_prediction, tuned_time_prediction, excel_file_path)
+    print("SLIM Analysis:")
     print("New P: {}, New Q: {}".format(best_p, best_q))
+ 
+    # if(len(args) > 2):
+    #     createEx = create_excel.CreateSlimExcel(slim_proj_dict, args[2])
+
+    # print("New P: {}, New Q: {}".format(best_p, best_q))
+
+def plot_slim_data(slim_proj_dict, best_c, best_p, best_q, excel_file_path):
+    """
+    Plots SLIM data and saves plots to an Excel worksheet named 'SLIM Plots'.
+
+    Args:
+        slim_proj_dict (dict): Dictionary containing SLIM project data.
+        best_c (float): Best calculated technology constant (C).
+        best_p (float): Best calculated P value (Gaffney P).
+        best_q (float): Best calculated Q value (Gaffney Q).
+        excel_file_path (str): Path to the Excel file where plots will be saved.
+    """
+
+    slocs = [proj.S for proj in slim_proj_dict.values()]
+    efforts = [proj.K for proj in slim_proj_dict.values()]
+    dev_times = [proj.t_d for proj in slim_proj_dict.values()]
+    ks_p = [proj.K ** best_p for proj in slim_proj_dict.values()]
+    tds_q = [proj.t_d ** best_q for proj in slim_proj_dict.values()]
+
+    # Create lists of constant values for P, Q, and C
+    ps = [best_p] * len(slocs)
+    qs = [best_q] * len(slocs)
+    cs = [best_c] * len(slocs)
+
+    plot_data = [
+        (slocs, efforts, "Effort vs SLOC", "SLOC", "Effort (Labor Yrs)", "slim_effort_sloc.png"),
+        (slocs, dev_times, "Dev Time vs SLOC", "SLOC", "Dev Time (Yrds) t_d", "slim_devtime_sloc.png"),
+        (slocs, ks_p, "K^p vs SLOC", "SLOC", "K^p", "slim_kp_sloc.png"),
+        (slocs, tds_q, "t_d^q vs SLOC", "SLOC", "t_d^q", "slim_tdq_sloc.png"),
+        (slocs, ps, "P vs SLOC", "SLOC", "P", "slim_p_sloc.png"),
+        (slocs, qs, "Q vs SLOC", "SLOC", "Q", "slim_q_sloc.png"),
+        (slocs, cs, "C vs SLOC", "SLOC", "C", "slim_c_sloc.png"),
+    ]
+
+    try:
+        workbook = load_workbook(excel_file_path)
+    except FileNotFoundError:
+        workbook = Workbook()
+
+    if "SLIM Plots" in workbook.sheetnames:
+        del workbook["SLIM Plots"]
+    worksheet = workbook.create_sheet("SLIM Plots")
+
+    temp_image_files = []
+
+    for i, (x, y, title, xlabel, ylabel, filename) in enumerate(plot_data):
+        plt.figure(figsize=(8, 6))
+        plt.scatter(x, y, label="Data Points")
+
+        # Calculate regression line
+        coefficients = np.polyfit(x, y, 1)
+        poly = np.poly1d(coefficients)
+        plt.plot(x, poly(x), color='red', label="Best Fit Line")
+
+        plt.title(title)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(filename)
+        plt.close()
+
+        img = Image(filename)
+        worksheet.add_image(img, f"A{i * 30 + 1}")
+
+        temp_image_files.append(filename)
+
+    workbook.save(excel_file_path)
+
+    for filename in temp_image_files:
+        os.remove(filename)
+
+def plot_cocomo_data(data, tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_prediction, tuned_time_prediction, excel_file_path):
+    """
+    Plots COCOMO data and saves plots to an Excel worksheet named 'COCOMO Plots'.
+
+    Args:
+        data (dict): Dictionary containing COCOMO project data.
+        tuned_a (float): Tuned COCOMO coefficient 'a'.
+        tuned_b (float): Tuned COCOMO coefficient 'b'.
+        tuned_c (float): Tuned COCOMO coefficient 'c'.
+        tuned_d (float): Tuned COCOMO coefficient 'd'.
+        tuned_effort_prediction (numpy.ndarray): Predicted effort values.
+        tuned_time_prediction (numpy.ndarray): Predicted time values.
+        excel_file_path (str): Path to the Excel file where plots will be saved.
+    """
+
+    klocs, efforts, dev_times = load_cocomo_data(data)
+    slocs = klocs * 1000
+
+    plot_data = [
+        (slocs, [tuned_a] * len(slocs), "SLOC vs COCOMO(a)", "SLOC", "COCOMO(a)", "cocomo_sloc_a.png"),
+        (slocs, [tuned_b] * len(slocs), "SLOC vs COCOMO(b)", "SLOC", "COCOMO(b)", "cocomo_sloc_b.png"),
+        (slocs, [tuned_c] * len(slocs), "SLOC vs COCOMO(c)", "SLOC", "COCOMO(c)", "cocomo_sloc_c.png"),
+        (slocs, efforts, "SLOC vs Effort (Labor Yrs)", "SLOC", "Effort (Labor Yrs)", "cocomo_sloc_effort.png"),
+        (slocs, dev_times, "SLOC vs Dev Time (Yrds) t_d", "SLOC", "Dev Time (Yrds) t_d", "cocomo_sloc_devtime.png"),
+        (slocs, tuned_effort_prediction, "SLOC vs Predicted Effort", "SLOC", "Predicted Effort", "cocomo_sloc_predicted_effort.png"),
+        (slocs, tuned_time_prediction, "SLOC vs Predicted Time", "SLOC", "Predicted Time", "cocomo_sloc_predicted_time.png"),
+    ]
+
+    try:
+        workbook = load_workbook(excel_file_path)
+    except FileNotFoundError:
+        workbook = Workbook()
+
+    if "COCOMO Plots" in workbook.sheetnames:
+        del workbook["COCOMO Plots"]
+    worksheet = workbook.create_sheet("COCOMO Plots")
+
+    temp_image_files = []
+
+    for i, (x, y, title, xlabel, ylabel, filename) in enumerate(plot_data):
+        plt.figure(figsize=(8, 6))
+        plt.scatter(x, y, label="Data Points")
+
+        # Calculate regression line
+        coefficients = np.polyfit(x, y, 1)
+        poly = np.poly1d(coefficients)
+        plt.plot(x, poly(x), color='red', label="Best Fit Line", linewidth=2)
+
+        plt.title(title)
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.legend()
+        plt.grid(True)
+
+        # Limit y-axis range for SLOC vs. Dev Time
+        if title == "SLOC vs Dev Time (Yrds) t_d":
+            plt.ylim(0, 10)  # Set y-axis limits to 0-10 years
+
+        plt.savefig(filename)
+        plt.close()
+
+        img = Image(filename)
+        worksheet.add_image(img, f"A{i * 30 + 1}")
+
+        temp_image_files.append(filename)
+
+    workbook.save(excel_file_path)
+
+    for filename in temp_image_files:
+        os.remove(filename)
 
 def generate_new_data(min_sloc, max_sloc, best_c, best_p, best_q, slim_proj_dict, num_entries, total_src_code, total_dev_time):
     
@@ -199,6 +374,60 @@ def generate_new_data(min_sloc, max_sloc, best_c, best_p, best_q, slim_proj_dict
         itr += 1
         num_entries -=1
 
+def generate_cocomo_data(min_sloc, max_sloc, num_entries, total_effort, total_dev_time):
+    """
+    Generates random data for COCOMO calculations with updated logic.
+
+    Args:
+        min_sloc (int): Minimum Source Lines of Code (SLOC).
+        max_sloc (int): Maximum Source Lines of Code (SLOC).
+        num_entries (int): Number of data entries to generate.
+        total_effort (float): Approximate total effort for the generated projects.
+        total_dev_time (float): Approximate total development time for the generated projects.
+
+    Returns:
+        dict: A dictionary containing generated project data.
+    """
+    try:
+        lowerLimit = int(min_sloc)
+    except ValueError:
+        lowerLimit = 45000
+        print("Lower Limit couldn't be read in, using 45000")
+
+    try:
+        upperLimit = int(max_sloc)
+    except ValueError:
+        upperLimit = 900000
+        print("Upper Limit couldn't be read in, using 900000")
+
+    if num_entries <= 0:
+        return {"Projects": {}}
+
+    effort_ratio = total_effort / num_entries
+    time_ratio = total_dev_time / num_entries
+
+    cocomo_data = {"Projects": {}}
+    for i in range(1, num_entries + 1):
+        project_name = f"project{i}"
+        sloc = int(np.ceil(random.randint(lowerLimit, upperLimit) / 100.0)) * 100
+
+        # Controlled variation
+        effort_variation = random.uniform(-variation_range, variation_range)  
+        time_variation = random.uniform(-variation_range, variation_range)   
+
+        effort = round(effort_ratio * (1 + effort_variation), 2)
+        development_time = round(time_ratio * (1 + time_variation), 2)
+
+        effort = max(0, effort)
+        development_time = max(0, development_time)
+
+        cocomo_data["Projects"][project_name] = {
+            "SLOC": sloc,
+            "Effort": effort,
+            "Development Time": development_time,
+        }
+
+    return cocomo_data
 def get_new_total_values(slim_proj_dict):
     '''
     @param slim_proj_dict   - dictionary of SLIM models
@@ -329,6 +558,208 @@ def run_analysis(env_mode, all_effort, all_dev_time, all_c, data_array_temp, dat
         proj.K = proj.solve_for_K()
 
     return newAvgP, newAvgQ, tempC
+
+def load_cocomo_data(data):
+    """Loads COCOMO data and converts SLOC to KLOC."""
+    kloc_values = []
+    effort_values = []
+    time_values = []
+    project_data = data["Projects"]
+    for proj in project_data.values():
+        kloc = proj["SLOC"] / 1000.0
+        effort = proj["Effort"]
+        time = proj["Development Time"]
+        kloc_values.append(kloc)
+        effort_values.append(effort)
+        time_values.append(time)
+    return np.array(kloc_values), np.array(effort_values), np.array(time_values)
+
+def fit_cocomo_effort(kloc_values, effort_values):
+    """Fits COCOMO effort equation (Effort = a * KLOC^b) using log transformation."""
+    scaler = MinMaxScaler()
+    scaled_kloc = scaler.fit_transform(np.array(kloc_values).reshape(-1, 1))
+    log_kloc = np.log(np.maximum(scaled_kloc.flatten(), 1e-10))
+
+    log_effort = np.log(np.array(effort_values) + 1e-10)  # Add constant to avoid log(0)
+
+    effort_model = Ridge(alpha=1.0)
+    effort_model.fit(log_kloc.reshape(-1, 1), log_effort)
+
+    b = effort_model.coef_[0]
+    a = np.exp(effort_model.intercept_)
+
+    return a, b, effort_model.predict(log_kloc.reshape(-1, 1))
+
+def fit_cocomo_time(effort_values, time_values):
+    """Fits COCOMO time equation (Time = c * Effort^d) using log transformation."""
+    log_effort = np.log(effort_values)
+    log_time = np.log(time_values)
+
+    time_model = LinearRegression()
+    time_model.fit(log_effort.reshape(-1, 1), log_time)
+
+    d = time_model.coef_[0]
+    c = np.exp(time_model.intercept_)
+
+    return c, d, time_model.predict(log_effort.reshape(-1, 1))
+
+def calculate_variance(actual_values, predicted_values):
+    """Calculates the variance between actual and predicted values."""
+    return np.var(actual_values - np.exp(predicted_values))
+
+def tune_cocomo_parameters_cocomo_aware(kloc_values, effort_values, time_values, nominal_a, nominal_b, nominal_c, nominal_d, variation_range=0.1, cocomo_weight=0.1):
+    """Tunes COCOMO parameters with COCOMO performance awareness."""
+    best_a, best_b, best_c, best_d = nominal_a, nominal_b, nominal_c, nominal_d
+    min_score = float('inf')
+
+    for a in np.linspace(nominal_a * (1 - variation_range), nominal_a * (1 + variation_range), 5):
+        for b in np.linspace(nominal_b * (1 - variation_range), nominal_b * (1 + variation_range), 5):
+            for c in np.linspace(nominal_c * (1 - variation_range), nominal_c * (1 + variation_range), 5):
+                for d in np.linspace(nominal_d * (1 - variation_range), nominal_d * (1 + variation_range), 5):
+                    _, _, predicted_log_effort = fit_cocomo_effort(kloc_values, effort_values)
+                    effort_variance = calculate_variance(effort_values, predicted_log_effort)
+
+                    _, _, predicted_log_time = fit_cocomo_time(effort_values, time_values)
+                    time_variance = calculate_variance(time_values, predicted_log_time)
+
+                    cocomo_score = (nominal_a - a) + (nominal_b - b) + (d - nominal_d) + (c - nominal_c)
+                    score = effort_variance + time_variance + cocomo_weight * cocomo_score
+
+                    if score < min_score:
+                        min_score = score
+                        best_a, best_b, best_c, best_d = a, b, c, d
+
+    return best_a, best_b, best_c, best_d
+
+def run_cocomo_analysis(data, cocomo_enum):
+    """
+    Runs COCOMO analysis using the COCOMO class and model type.
+    """
+    kloc_values = []
+    effort_values = []
+    time_values = []
+    cocomo_projects = {}
+
+    for proj_name, proj_data in data["Projects"].items():
+        kloc = proj_data["SLOC"] / 1000.0
+        effort = proj_data["Effort"]
+        dev_time = proj_data["Development Time"]
+
+        kloc_values.append(kloc)
+        effort_values.append(effort)
+        time_values.append(dev_time)
+
+        cocomo_projects[proj_name] = COCOMO(kloc, cocomo_enum)
+
+    # Calculate tuned coefficients using log transformation
+    tuned_a, tuned_b, log_predicted_effort = fit_cocomo_effort(np.array(kloc_values), np.array(effort_values))
+    tuned_c, tuned_d, log_predicted_time = fit_cocomo_time(np.array(effort_values), np.array(time_values))
+
+    # Calculate predicted effort and time (exponentiated)
+    tuned_effort_prediction = np.exp(log_predicted_effort)
+    tuned_time_prediction = np.exp(log_predicted_time)
+
+    # Scale effort values
+    scaler = MinMaxScaler()
+    scaled_effort_values = scaler.fit_transform(np.array(tuned_effort_prediction).reshape(-1, 1)).flatten() #scale predicted values instead.
+
+    # Calculate variances using scaled effort values
+    tuned_effort_variance = np.var(scaled_effort_values)
+
+    tuned_time_variance = np.var(time_values)
+
+    return tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_variance, tuned_time_variance, tuned_effort_prediction, tuned_time_prediction
+
+def write_cocomo_to_excel(file_loc, tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_variance, tuned_time_variance, tuned_effort_prediction, tuned_time_prediction, data):
+    """Writes COCOMO results to a new worksheet in the Excel file with the specified format, adds COCOMO(b) column, and removes unnecessary variances."""
+    try:
+        workbook = load_workbook(file_loc)
+    except FileNotFoundError:
+        workbook = Workbook()  # Create a new workbook if the file doesn't exist
+
+    if "COCOMO Results" in workbook.sheetnames:
+        del workbook["COCOMO Results"]  # Remove existing sheet if it exists
+    worksheet = workbook.create_sheet("COCOMO Results")
+
+    # Define styles
+    bold_border = Border(left=Side(style='medium'), right=Side(style='medium'), top=Side(style='medium'), bottom=Side(style='medium'))
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    font = Font(name='Arial', size=10)
+    center_alignment = Alignment(horizontal='center')
+    right_alignment = Alignment(horizontal='right')
+    header_fill = PatternFill(start_color="B7C9E2", end_color="B7C9E2", fill_type="solid")  # Use B7C9E2 for light blue
+
+    # Write COCOMO header (Starting at column B)
+    start_col = 2  # Column B
+    headers = ["Source Lines of Code", "Effort (Labor Yrs)", "COCOMO (a)", "COCOMO (b)", "KLOC^b", "Dev Time (Yrs) t_d", "COCOMO (c)", "Effort^d", "Predicted Effort", "Predicted Time"]
+    for col_num, header in enumerate(headers, start=1):
+        cell = worksheet.cell(row=1, column=col_num + start_col - 1)
+        cell.value = header
+        cell.border = bold_border
+        cell.alignment = center_alignment
+        cell.fill = header_fill
+
+    # Write COCOMO data (Starting at column B)
+    kloc_values = [proj["SLOC"] / 1000.0 for proj in data["Projects"].values()]
+    effort_values = [proj["Effort"] for proj in data["Projects"].values()]
+    time_values = [proj["Development Time"] for proj in data["Projects"].values()]
+    predicted_effort = tuned_a * (np.array(kloc_values) ** tuned_b)
+    predicted_time = tuned_c * (np.array(effort_values) ** tuned_d)
+
+    for row_num, (kloc, effort, time, pred_effort, pred_time) in enumerate(zip(kloc_values, effort_values, time_values, predicted_effort, predicted_time), start=2):
+        worksheet.cell(row=row_num, column=start_col).value = kloc * 1000
+        worksheet.cell(row=row_num, column=start_col + 1).value = effort
+        worksheet.cell(row=row_num, column=start_col + 2).value = tuned_a
+        worksheet.cell(row=row_num, column=start_col + 3).value = tuned_b
+        worksheet.cell(row=row_num, column=start_col + 4).value = kloc ** tuned_b
+        worksheet.cell(row=row_num, column=start_col + 5).value = time
+        worksheet.cell(row=row_num, column=start_col + 6).value = tuned_c
+        worksheet.cell(row=row_num, column=start_col + 7).value = effort ** tuned_d
+        worksheet.cell(row=row_num, column=start_col + 8).value = pred_effort
+        worksheet.cell(row=row_num, column=start_col + 9).value = pred_time
+        for col_num in range(start_col, start_col + 10):
+            cell = worksheet.cell(row=row_num, column=col_num)
+            cell.border = bold_border
+            cell.alignment = right_alignment
+
+    # Calculate and write averages (Starting at column B)
+    avg_row = row_num + 1
+    worksheet.cell(row=avg_row, column=start_col - 1).value = "AVERAGE"
+    worksheet.cell(row=avg_row, column=start_col - 1).border = bold_border
+    worksheet.cell(row=avg_row, column=start_col - 1).fill = header_fill
+    for col_num in range(start_col, start_col + 10):
+        avg = np.mean([worksheet.cell(row=r, column=col_num).value for r in range(2, avg_row)])
+        cell = worksheet.cell(row=avg_row, column=col_num)
+        cell.value = avg
+        cell.border = bold_border
+        cell.alignment = right_alignment
+
+    # Calculate and write variances (Starting at column B)
+    var_row = row_num + 2
+    worksheet.cell(row=var_row, column=start_col - 1).value = "Variance"
+    worksheet.cell(row=var_row, column=start_col - 1).border = bold_border
+    worksheet.cell(row=var_row, column=start_col - 1).fill = header_fill
+
+    # Columns to skip variance calculation for
+    skip_variance_cols = [start_col, start_col + 2, start_col + 3, start_col + 6]
+
+    for col_num in range(start_col, start_col + 10):
+        if col_num in skip_variance_cols:
+            worksheet.cell(row=var_row, column=col_num).value = ""  # Leave blank
+        else:
+            values = [worksheet.cell(row=r, column=col_num).value for r in range(2, avg_row)]
+            variance = np.var(values)
+            cell = worksheet.cell(row=var_row, column=col_num)
+            cell.value = variance
+            cell.border = bold_border
+            cell.alignment = right_alignment
+
+    # Auto-adjust column widths
+    for column_cells in worksheet.columns:
+        length = max(len(str(cell.value)) for cell in column_cells if cell.value)
+        worksheet.column_dimensions[get_column_letter(column_cells[0].column)].width = length + 2  # Add some padding
+
+    workbook.save(file_loc)
 
 if __name__ == '__main__':
 
