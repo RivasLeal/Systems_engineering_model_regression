@@ -11,7 +11,8 @@
 ### Before you run
 Before running the script, ensure you have Python 3.12 or greater installed, so that the necessary libraries can be installed.
 The libraries you need to install are openpyxl, numpy, matplotlib, scikit-learn, and Pillow. 
-In order to install those libraries, run the following command in your local command prompt terminal:
+<br/> In order to install those libraries, run the following command in your local command prompt terminal:<br/>
+<br/>
 <br/>pip install openpyxl numpy matplotlib scikit-learn Pillow<br/>
 
 ### How to Run?
