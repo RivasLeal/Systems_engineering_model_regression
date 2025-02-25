@@ -8,6 +8,12 @@
 
 ## Final Project Source code 
 
+### Before you run
+Before running the script, ensure you have Python 3.12 or greater installed, so that the necessary libraries can be installed.
+The libraries you need to install are openpyxl, numpy, matplotlib, scikit-learn, and Pillow. 
+In order to install those libraries, run the following command in your local command prompt terminal:
+<br/>pip install openpyxl numpy matplotlib scikit-learn Pillow<br/>
+
 ### How to Run?
 
 The script needs one argument to run at the minimum and that must be the location of where you Data JSON Lives.
@@ -51,10 +57,6 @@ The following field(s) are needed in the JSON but can be left alone:
     <br/>i) MAX Range for the Lines of code that can be generated
     <br/>ii) Generated data cannot have SLOC greater than this value<br/>
 
-The following field(s) are not currently supported:
-1) Labor Hours in a Month
-    <br/>i) Added for COCOMO but hasn't found a use yet<br/>
-
 Each Project must have the following fields:
 1) SLOC: Source Lines of Code (NOT KSLOC)
 2) Development Time: The code will assume that any time you put in here is in YEARS
@@ -67,4 +69,4 @@ Each Project must have the following fields:
 The user can specify the number of data points they want to generate and relies on the already established data to generate some sort of output. The lines of code are chosen between a specified Min and Max found in the JSON, from there development time is calculated using a ratio of the SLOC to effort calculated from the already existing data and multiplying it by a random number anywhere from 0.90 to 1.10. Effort is calculated using the other established values.
 
 ### Generate Excel output
-The user can specify a location where they can output a excel sheet if they so choose to, This excel sheet will be properly formatted and will have three sections. The first section on the left will be all the SLIM data from all project (even generated ones). The second of to the right will have AVERAGE and Variance calulated for specified fields. The final table on the bottom right will have R^2 values for certain comparison.
+The user can specify a location where they can output a excel sheet if they so choose to, This excel sheet will be properly formatted and will have three sections. The first section on the left will be all the SLIM data from all project (even generated ones). The second of to the right will have AVERAGE and Variance calulated for specified fields. The final table on the bottom right will have R^2 values for certain comparison.Additionally, the excel sheet will contain charts that display the SLIM and COCOMO data plotted with the best fit line. 
