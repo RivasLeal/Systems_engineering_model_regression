@@ -2,6 +2,7 @@
     "Labor Hours in a Month" : 166.6,
     "Environment Mode" : "Embedded",
     "Generation Iterations" : 0,
+    "Selective Generative Variance" : 0.25,
     "Min SLOC Generation": 45000,
     "MAX SLOC Generation": 900000,
 

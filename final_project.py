@@ -50,6 +50,7 @@ def main(args):
     effort_string = "Effort"
     labor_hours_string = "Labor Hours in a Month"
     env_mode_string = "Environment Mode"
+    gen_var_string = "Selective Generative Variance"
     gener_iter = "Generation Iterations"
     min_sloc = "Min SLOC Generation"
     max_sloc = "MAX SLOC Generation"
@@ -72,6 +73,12 @@ def main(args):
     # Environment Vars found in the JSON
     labor_hours_to_months = data[labor_hours_string]
     env_mode = data[env_mode_string]
+    
+    gen_var_float = 0.0
+    try:
+        gen_var_float = float(data[gen_var_string])
+    except:
+        gen_var_float = 0.15
 
     # Create a COCOMO ENUM of UNDEFINED
     cocomo_enum = COCOMO_ENUM.UNDEFINED
@@ -107,13 +114,7 @@ def main(args):
         total_effort += eff
 
     temp = SLIM(env_mode)
-    if (len(args) > 1):
-        try:
-            num_entries = int(args[1])
-            print("Generating: {} data points".format(args[1]))
-            generate_new_data(data[min_sloc], data[max_sloc], (sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict, num_entries, total_src_code, total_dev_time)
-        except:
-            print("Not a valid int")
+    
     iter = 0
     iter_limit = data[gener_iter]
 
@@ -135,7 +136,7 @@ def main(args):
             
             if(c > best_c):
                 best_q = q
-                best_p = p
+                best_p = p 
                 best_c = c
 
             iter += 1
@@ -147,6 +148,14 @@ def main(args):
         proj.func.p = best_p
         proj.func.q = best_q
         proj.K = round(proj.solve_for_K(), 4)
+
+    if (len(args) > 1):
+        try:
+            num_entries = int(args[1])
+            print("Generating: {} data points".format(args[1]))
+            generate_new_data(data[min_sloc], data[max_sloc], (sum(all_C) / len(all_C)), temp.func.p, temp.func.q, slim_proj_dict, num_entries, total_src_code, total_dev_time, gen_var_float)
+        except:
+            print("Not a valid int")
 
     # COCOMO Analysis
     num_entries = int(args[1]) if len(args) > 1 else 0
@@ -282,8 +291,8 @@ def plot_cocomo_data(data, tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_pred
     slocs = klocs * 1000
 
     plot_data = [
-    (slocs, efforts, "SLOC vs Effort (Labor Yrs)", "SLOC", "Effort (Labor Yrs)", "cocomo_sloc_effort.png"),
-    (slocs, dev_times, "SLOC vs Dev Time (Yrs) t_d", "SLOC", "Dev Time (Yrs) t_d", "cocomo_sloc_devtime.png"),
+    (slocs, efforts, "SLOC vs Effort (Labor Months)", "SLOC", "Effort (Labor Months)", "cocomo_sloc_effort.png"),
+    (slocs, dev_times, "SLOC vs Dev Time (Months) t_d", "SLOC", "Dev Time (YrMonthss) t_d", "cocomo_sloc_devtime.png"),
     (slocs, tuned_effort_prediction, "SLOC vs Predicted Effort", "SLOC", "Predicted Effort", "cocomo_sloc_predicted_effort.png"),
     (slocs, tuned_time_prediction, "SLOC vs Predicted Time", "SLOC", "Predicted Time", "cocomo_sloc_predicted_time.png"),
     (slocs, [tuned_a] * len(slocs), "SLOC vs COCOMO(a)", "SLOC", "COCOMO(a)", "cocomo_sloc_a.png"),
@@ -344,7 +353,7 @@ def plot_cocomo_data(data, tuned_a, tuned_b, tuned_c, tuned_d, tuned_effort_pred
     for filename in temp_image_files:
         os.remove(filename)
 
-def generate_new_data(min_sloc, max_sloc, best_c, best_p, best_q, slim_proj_dict, num_entries, total_src_code, total_dev_time):
+def generate_new_data(min_sloc, max_sloc, best_c, best_p, best_q, slim_proj_dict, num_entries, total_src_code, total_dev_time, gen_var_float):
     
     try:
         lowerLimit = int(min_sloc)
@@ -370,7 +379,7 @@ def generate_new_data(min_sloc, max_sloc, best_c, best_p, best_q, slim_proj_dict
         variance = 0
         
         while variance == 0:
-           variance = 1 + uniform(-0.10,0.10)
+           variance = 1 + uniform((-1 *gen_var_float),gen_var_float)
 
         slim_proj_dict[project].t_d = round(estimated_development_time, 2) 
 
@@ -573,8 +582,8 @@ def load_cocomo_data(data):
     project_data = data["Projects"]
     for proj in project_data.values():
         kloc = proj["SLOC"] / 1000.0
-        effort = proj["Effort"]
-        time = proj["Development Time"]
+        effort = proj["Effort"] * 12
+        time = proj["Development Time"] * 12
         kloc_values.append(kloc)
         effort_values.append(effort)
         time_values.append(time)
@@ -655,11 +664,14 @@ def run_cocomo_analysis(data, cocomo_enum):
     """
     Runs COCOMO analysis using the COCOMO class and model type.
     """
+
+    temp = COCOMO(0, cocomo_enum)
+
     kloc_values, effort_values, time_values = load_cocomo_data(data)
-    nominal_a = 2.4 #adjust these based on the cocomo model.
-    nominal_b = 1.05
-    nominal_c = 2.5
-    nominal_d = 0.38
+    nominal_a = temp.a #adjust these based on the cocomo model.
+    nominal_b = temp.b
+    nominal_c = temp.c
+    nominal_d = temp.d
 
     tuned_a, tuned_b, tuned_c, tuned_d = tune_cocomo_parameters_cocomo_aware(
         kloc_values, effort_values, time_values, nominal_a, nominal_b, nominal_c, nominal_d
@@ -700,7 +712,7 @@ def write_cocomo_to_excel(file_loc, tuned_a, tuned_b, tuned_c, tuned_d, tuned_ef
 
     # Write COCOMO header (Starting at column B)
     start_col = 2  # Column B
-    headers = ["Source Lines of Code", "Effort (Labor Yrs)", "COCOMO (a)", "COCOMO (b)", "KLOC^b", "Dev Time (Yrs) t_d", "COCOMO (c)", "Effort^d", "Predicted Effort", "Predicted Time"]
+    headers = ["Source Lines of Code", "Effort (Labor Months)", "COCOMO (a)", "COCOMO (b)", "KLOC^b", "Dev Time (Months) t_d", "COCOMO (c)", "Effort^d", "Predicted Effort", "Predicted Time"]
     for col_num, header in enumerate(headers, start=1):
         cell = worksheet.cell(row=1, column=col_num + start_col - 1)
         cell.value = header
